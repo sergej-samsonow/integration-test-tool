@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project model="1.2">
+    <!-- Integration test object model - akka maven project object model -->
+    <properties>
+        <database1.name         env="DATABASE_NAME"     >somedatabasename</database1.name>
+        <database1.user         env="DATABASE_USER"     >somedatabaseuser</database1.user>
+        <database1.pass         env="DATABASE_PASS"     >somedatabasepass</database1.pass>
+        <database1.ip           env="DATABASE_IP"       >127.0.0.1</database1.ip>
+        <database1.port         env="DATABASE_PORT"     >3306</database1.port>
+        <database1.dump.file    env="DATABASE_DUMPFILE" >/path/to/some/database/dumpfile</database1.dump.file>
+
+        <service1.address       env="SERVICE_1_ADDRESS" >localhost</service1.address>
+        <service1.port          env="SERVICE_1_PORT"    >8080</service1.port>
+        <service2.address       env="SERVICE_2_ADDRESS" >localhost</service2.address>
+        <service2.port          env="SERVICE_2_PORT"    >8080</service2.port>
+    </properties>
+    <drivers>
+        <driver id="org.flate.driver.database.mysql" version="1.0" />
+        <driver id="org.flate.driver.http.rest"      version="1.0" />
+    </drivers>
+    <services>
+        <service id="database1" driver="org.flate.driver.database.mysql">
+            <name>$database1.name</name>
+            <user>$database1.user</user>
+            <pass>$database1.pass</pass>
+            <host ip="$database1.host" port="$database1.port" />
+            <connection ssl="false" charset="utf8" />
+            <reset sqldumpfile="$database1.dump.file" />
+        </service>
+        <service id="service1" driver="org.flate.driver.http.rest">
+            <host shema="http" address="$service1.address" port="$service1.port" /> 
+        </service>
+        <service id="service2" driver="org.flate.driver.http.rest">
+            <host shema="http" address="$service2.address" port="$service2.port" /> 
+            <reset method="get" path="/management/reset" />
+        </service>
+    </services>
+</project>
