@@ -924,7 +924,7 @@ class Itom {
         $tokenizer = new Tokenizer($this->variables, $value);
         return $tokenizer->interpolated();
     }
-    private function parseProperties() {
+    private function parseVariables() {
         foreach ($this->model->variables as $variables) {
             foreach ($variables as $key => $value) {
                 $name                   = "$key";
