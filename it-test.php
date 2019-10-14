@@ -1068,7 +1068,7 @@ if ( ! $itom->isValid()) {
     exit(1);
 }
 
-$evn = $itom->getEnv();
+$env = $itom->getEnv();
 $configuration = new Configuration($env, $argv);
 $report = $configuration->getReport();
 
