@@ -1039,7 +1039,7 @@ class Itom {
         }
         $this->model = simplexml_load_string((file_get_contents(join_path([$pwd, 'itom.xml']))));
         $this->env = new stdClass();
-        $this->parseProperties();
+        $this->parseVariables();
         $this->parseServices();
         $this->env->pwd = $pwd;
         $this->env->testFolder  = sprintf("%s%sintegration-tests", $pwd, DIRECTORY_SEPARATOR);
