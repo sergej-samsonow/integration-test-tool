@@ -1,9 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project model="1.2">
     <!-- Integration test object model - akka maven project object model -->
-    <!-- Rename to variables because . is not supported and properties use . (dots) often -->
     <description>Some test environment</description>
-    <properties>
+    <variables>
         <database1Name         env="DATABASE_NAME"     >somedatabasename</database1Name>
         <database1User         env="DATABASE_USER"     >somedatabaseuser</database1User>
         <database1Pass         env="DATABASE_PASS"     >somedatabasepass</database1Pass>
@@ -15,11 +14,7 @@
         <service1Port          env="SERVICE_1_PORT"    >8080</service1Port>
         <service2Address       env="SERVICE_2_ADDRESS" >localhost</service2Address>
         <service2Port          env="SERVICE_2_PORT"    >8075</service2Port>
-    </properties>
-    <drivers>
-        <driver id="database.mysql" version="1.0" />
-        <driver id="http.rest"      version="1.0" />
-    </drivers>
+    </variables>
     <services>
         <service id="someServiceDatabase" driver="database.mysql">
             <name>$database1Name</name>

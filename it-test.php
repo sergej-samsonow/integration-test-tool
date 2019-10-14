@@ -925,8 +925,8 @@ class Itom {
         return $tokenizer->interpolated();
     }
     private function parseProperties() {
-        foreach ($this->model->properties as $properties) {
-            foreach ($properties as $key => $value) {
+        foreach ($this->model->variables as $variables) {
+            foreach ($variables as $key => $value) {
                 $name                   = "$key";
                 $defaultValue           = "$value";
                 $envName                = $this->interpolate("{$value['env']}");
