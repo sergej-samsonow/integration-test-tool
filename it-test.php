@@ -1042,7 +1042,7 @@ class Itom {
         $this->parseVariables();
         $this->parseServices();
         $this->env->pwd = $pwd;
-        $this->env->testFolder  = sprintf("%s%sintegration-tests", $pwd, DIRECTORY_SEPARATOR);
+        $this->env->testFolder  = sprintf("%s%sintegration-test", $pwd, DIRECTORY_SEPARATOR);
         $this->env->description = "Intgration Tests: " . $this->env->testFolder;
         if (isset($this->model->description)) {
             $this->env->description = $this->interpolate("{$this->model->description}");
