@@ -1,38 +1,37 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project model="1.2">
     <!-- Integration test object model - akka maven project object model -->
+    <!-- Rename to variables because . is not supported and properties use . (dots) often -->
+    <description>Some test environment</description>
     <properties>
-        <database1.name         env="DATABASE_NAME"     >somedatabasename</database1.name>
-        <database1.user         env="DATABASE_USER"     >somedatabaseuser</database1.user>
-        <database1.pass         env="DATABASE_PASS"     >somedatabasepass</database1.pass>
-        <database1.ip           env="DATABASE_IP"       >127.0.0.1</database1.ip>
-        <database1.port         env="DATABASE_PORT"     >3306</database1.port>
-        <database1.dump.file    env="DATABASE_DUMPFILE" >/path/to/some/database/dumpfile</database1.dump.file>
+        <database1Name         env="DATABASE_NAME"     >somedatabasename</database1Name>
+        <database1User         env="DATABASE_USER"     >somedatabaseuser</database1User>
+        <database1Pass         env="DATABASE_PASS"     >somedatabasepass</database1Pass>
+        <database1Ip           env="DATABASE_IP"       >127.0.0.1</database1Ip>
+        <database1Port         env="DATABASE_PORT"     >3306</database1Port>
+        <database1DumpFile     env="DATABASE_DUMPFILE" >/path/to/some/database/dumpfile</database1DumpFile>
 
-        <service1.address       env="SERVICE_1_ADDRESS" >localhost</service1.address>
-        <service1.port          env="SERVICE_1_PORT"    >8080</service1.port>
-        <service2.address       env="SERVICE_2_ADDRESS" >localhost</service2.address>
-        <service2.port          env="SERVICE_2_PORT"    >8080</service2.port>
+        <service1Address       env="SERVICE_1_ADDRESS" >localhost</service1Address>
+        <service1Port          env="SERVICE_1_PORT"    >8080</service1Port>
+        <service2Address       env="SERVICE_2_ADDRESS" >localhost</service2Address>
+        <service2Port          env="SERVICE_2_PORT"    >8075</service2Port>
     </properties>
     <drivers>
-        <driver id="org.flate.driver.database.mysql" version="1.0" />
-        <driver id="org.flate.driver.http.rest"      version="1.0" />
+        <driver id="database.mysql" version="1.0" />
+        <driver id="http.rest"      version="1.0" />
     </drivers>
     <services>
-        <service id="database1" driver="org.flate.driver.database.mysql">
-            <name>$database1.name</name>
-            <user>$database1.user</user>
-            <pass>$database1.pass</pass>
-            <host ip="$database1.host" port="$database1.port" />
-            <connection ssl="false" charset="utf8" />
-            <reset sqldumpfile="$database1.dump.file" />
+        <service id="someServiceDatabase" driver="database.mysql">
+            <name>$database1Name</name>
+            <user>$database1User</user>
+            <pass>$database1Pass</pass>
+            <connection host="$database1Ip" port="$database1Port" charset="utf8" reset="$database1DumpFile" />
         </service>
-        <service id="service1" driver="org.flate.driver.http.rest">
-            <host shema="http" address="$service1.address" port="$service1.port" /> 
+        <service id="someService" driver="http.rest">
+            <connection schema="http" host="$service1Address" port="$service1Port" /> 
         </service>
-        <service id="service2" driver="org.flate.driver.http.rest">
-            <host shema="http" address="$service2.address" port="$service2.port" /> 
-            <reset method="get" path="/management/reset" />
+        <service id="someOtherService" driver="http.rest">
+            <connection schema="http" host="$service2Address" port="$service2Port" reset="/management/reset" />
         </service>
     </services>
 </project>

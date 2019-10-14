@@ -2,8 +2,6 @@
 
 <?php
 
- 
-
 # php it-test --category=010-management --suite=020-terminal-management.xml --skip-first=4
 
 interface CommandResolver {
@@ -126,12 +124,11 @@ class Configuration {
         $this->skipFirst = -1;
         $this->report    = new Report($env->description);
         foreach ($env->service as $name => $component) {
-            if (isset($component->db)) {
-                $this->addToDatabases($name, new Database($component->db)); 
+            if ($component->driver == 'database.mysql') {
+                $this->addToDatabases($name, new Database($component)); 
             }
-
-            if (isset($component->service)) {
-                $this->addToServices($name, new Service($component->service)); 
+            else {
+                $this->addToServices($name, new Service($component)); 
             }
         }       
         $this->parseArgv();
@@ -896,49 +893,6 @@ class Suite {
     }
 }
 
- 
-
-$env                            = new stdClass();
-$env->pwd                       = getcwd();
-
-$env->testFolder                = 'C:\projects\some-service-project\intergration-tests';
-$env->description               = 'Bla bla test environment';
-$env->service                   = new stdClass();
-$env->service->pone             = new stdClass();
-$env->service->pone->db         = new stdClass();
-
-
-# database configuration
-$env->service->someServiceDatabase->db->host   = '127.0.0.1';
-$env->service->someServiceDatabase->db->port   = '3306';
-$env->service->someServiceDatabase->db->user   = 'databaseuser';
-$env->service->someServiceDatabase->db->pass   = 'databasepass';
-$env->service->someServiceDatabase->db->name   = 'somedatabasename';
-$env->service->someServiceDatabase->db->dump   = 'C:\projects\some-service-project\war-simple\application.db.sql';
-$env->service->someServiceDatabase->db->conn   = sprintf('mysql:host=%s;port=%s;dbname=%s;charset=utf8',
-    $env->service->someServiceDatabase->db->host,
-    $env->service->someServiceDatabase->db->port,
-    $env->service->someServiceDatabase->db->name);
-$env->service->someServiceDatabase->db->opts   = [
-    PDO::ATTR_ERRMODE               => PDO::ERRMODE_EXCEPTION,
-    PDO::ATTR_DEFAULT_FETCH_MODE    => PDO::FETCH_OBJ,
-    PDO::ATTR_EMULATE_PREPARES      => false,
-];
-
- 
-
-# service configuration
-$env->service->someService->service                 = new stdClass();
-$env->service->someService->service->base           = 'http://localhost:8080/';
-
-$env->service->someOtherService                     = new stdClass();
-$env->service->someOtherService->service            = new stdClass();
-$env->service->someOtherService->service->base      = 'http://localhost:8098/';
-$env->service->someOtherService->service->prepare   = '/management/reset';
-
-$configuration = new Configuration($env, $argv);
-$report = $configuration->getReport();
-
 function filter_files($folder) {
     return array_filter(scandir($folder), function($v) { return $v != '.' &&  $v != '..'; });
 }
@@ -953,6 +907,171 @@ function join_path($parts) {
     }
     return ltrim($path, DIRECTORY_SEPARATOR);
 }
+
+ 
+class Itom {
+    private $error;
+    private $model;
+    private $variables;
+    private $argv;
+    private $env;
+
+    public function __construct($argv) {
+        $this->argv = $argv;
+        array_shift($this->argv);
+    }
+    private function interpolate($value) {
+        $tokenizer = new Tokenizer($this->variables, $value);
+        return $tokenizer->interpolated();
+    }
+    private function parseProperties() {
+        foreach ($this->model->properties as $properties) {
+            foreach ($properties as $key => $value) {
+                $name                   = "$key";
+                $defaultValue           = "$value";
+                $envName                = $this->interpolate("{$value['env']}");
+                $defaulValue            = $this->interpolate("{$value}");
+                $envValue               = getenv($envName);
+                $cmdParameter           = FALSE;
+
+                foreach ($this->argv as $parameter) {
+                    if (mb_strpos($parameter, "--D$name")  === 0) {
+                        list($prefix, $cmdParameter) = explode('=', $parameter);
+                        $cmdParameter = $this->interpolate("{$cmdParameter}");
+                        break;
+                    }
+                }
+                $varValue = '';
+                if ( $cmdParameter !== FALSE ) {
+                    $varValue = $cmdParameter;
+                }
+                else if ( $envValue !== FALSE ) {
+                    $varValue = $this->interpolate("$envValue");
+                }
+                else {
+                    $varValue = $defaulValue;
+                }
+                $this->variables[$name] = $varValue;
+            }
+        }
+    }
+    private function parseDatabaseConfiguration($service) {
+        $db   = new stdClass(); 
+        $db->driver = 'database.mysql';
+        $db->name   = $this->interpolate("{$service->name}");
+        $db->user   = $this->interpolate("{$service->user}");
+        $db->pass   = $this->interpolate("{$service->pass}");
+        $db->host   = '127.0.0.1';
+        $db->port   = 3306;
+        $db->charset= 'utf8';
+        $db->opts   = [
+            PDO::ATTR_ERRMODE               => PDO::ERRMODE_EXCEPTION,
+            PDO::ATTR_DEFAULT_FETCH_MODE    => PDO::FETCH_OBJ,
+            PDO::ATTR_EMULATE_PREPARES      => false,
+        ];
+        if (isset($service->connection)) {
+            if (isset($service->connection['host'])) {
+                $db->host   = $this->interpolate("{$service->connection['host']}");
+            }
+            if (isset($service->connection['port'])) {
+                $db->port   = $this->interpolate("{$service->connection['port']}");
+            }
+            if (isset($service->connection['reset'])) {
+                $db->dump   = $this->interpolate("{$service->connection['reset']}");
+            }
+            if (isset($service->connection['charset'])) {
+                $this->charset = $this->interpolate("{$service->connection['charset']}");
+            }
+        }
+        $db->conn   = "mysql:host={$db->host};port={$db->port};dbname={$db->name};charset={$db->charset}";
+        return $db;
+    }
+    private function parseRestConfiguration($service) {
+        $server         = new stdClass(); 
+        $server->driver = 'http.rest';
+        $server->schema = $this->interpolate("{$service->connection['schema']}");
+        $server->host   = $this->interpolate("{$service->connection['host']}");
+        $server->port   = $this->interpolate("{$service->connection['port']}");
+        if (isset($service->connection['reset'])) {
+            $server->reset = $this->interpolate("{$service->connection['reset']}");
+        }
+        if (    ($server->schema == 'http'  && ("{$server->port}" == "80")  || empty($server->port))
+            ||  ($server->schema == 'https' && ("{$server->port}" == "443") || empty($server->port))
+            ) {
+            $server->base   = "{$server->schema}://{$server->host}";
+        }
+        else {
+            $server->base   = "{$server->schema}://{$server->host}:{$server->port}";
+        }
+        return $server;
+    }
+    private function parseServices() {
+        foreach ($this->model->services as $services) {
+            foreach ($services->service as $service) {
+                $id     = $this->interpolate("{$service['id']}");
+                $driver = $this->interpolate("{$service['driver']}");
+                if (empty($id) || empty ($driver)) {
+                    continue;
+                }
+                if ( ! isset($this->env->service)) {
+                    $this->env->service = new stdClass();
+                }
+                if ( ! isset($this->env->service->{$id})) {
+                    $this->env->service->{$id} = new stdClass();
+                }
+
+                # workaround as long we haven't realy driver, change later don't match driver or service exactly
+                if ($driver === 'database.mysql') {
+                    $this->env->service->{$id} = $this->parseDatabaseConfiguration($service);
+                }
+                else if ($driver === 'http.rest' && isset($service->connection)) {
+                    $this->env->service->{$id} = $this->parseRestConfiguration($service);
+                }
+            }
+        }
+    }
+
+    public function load() {
+        $this->variables = [];
+        $pwd = getcwd();
+        if ( ! is_file($pwd . DIRECTORY_SEPARATOR . 'itom.xml')) {
+            $this->error = sprintf('Integration test model file itom.xml not found in: %s exit(1)', $pwd);
+        }
+        $this->model = simplexml_load_string((file_get_contents(join_path([$pwd, 'itom.xml']))));
+        $this->env = new stdClass();
+        $this->parseProperties();
+        $this->parseServices();
+        $this->env->pwd = $pwd;
+        $this->env->testFolder  = sprintf("%s%sintegration-tests", $pwd, DIRECTORY_SEPARATOR);
+        $this->env->description = "Intgration Tests: " . $this->env->testFolder;
+        if (isset($this->model->description)) {
+            $this->env->description = $this->interpolate("{$this->model->description}");
+        }
+    }
+
+    public function isValid() {
+        return empty($this->error);
+    }
+
+    public function getError() {
+        return $this->error;
+    }
+    public function getEnv() {
+        return $this->env;
+    }
+}
+
+$itom = new Itom($argv);
+$itom->load();
+if ( ! $itom->isValid()) {
+    echo $itom->getError() . PHP_EOL;
+    exit(1);
+}
+
+$evn = $itom->getEnv();
+$configuration = new Configuration($env, $argv);
+$report = $configuration->getReport();
+
 
 $cateogories = filter_files(join_path($env->testFolder));
 if (empty($cateogories)) {
