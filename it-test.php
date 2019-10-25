@@ -1132,7 +1132,7 @@ if ( ! $itom->isValid()) {
 $env = $itom->getEnv();
 
 $snippets = [];
-foreach (filter_files(join_path($env->testFolder)) as $category) {
+foreach (filter_files(join_path($env->snippetsFolder)) as $category) {
     foreach (filter_files(join_path([$env->snippetsFolder, $category])) as $file) {
         $snippet = new Snippet($env->snippetsFolder, $category, $file);
         $snippets[$snippet->getPath()] = $snippet;
