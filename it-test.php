@@ -175,7 +175,10 @@ class Configuration {
         return $this->services[$name];
     }
 
-    public function prepare(Context $context) {
+    public function prepare(Context $context, $shouldReuseContext) {
+        if ($shouldReuseContext) {
+            return;
+        }
         foreach ($this->databases as $database) {
             $database->prepare();
         }
@@ -687,6 +690,11 @@ class Macro {
                     $this->blocks[] = $block;
                 }
             }
+            else if ($name == 'snippet') {
+                foreach ($this->suite->getSnippetsBlocks("{$element['path']}") as $block) {
+                    $this->blocks[] = $block;
+                }
+            }
             else {
                 $this->blocks[] = parse_code_element($element);           
             }
@@ -805,18 +813,24 @@ class Test {
     private $suite;
     private $blocks;
     private $context;
+    private $reuseContext;
 
     public function __construct($suite, $test) {
         $this->configuration  = $suite->getConfiguration();
         $this->suite          = $suite;
         $this->blocks         = [];
-        $this->context        = new Context();
         $this->name           = "{$test['name']}";
+        $this->reuseContext   = "{$test['reset']}" == 'false';
         foreach ($test->children() as $name => $element) {
             $name = "$name";
             if ($name == 'macro') {
-                foreach ($this->suite->getMacroBlocks("{$element["name"]}") as $block) {
+                foreach ($this->suite->getMacroBlocks("{$element['name']}") as $block) {
                     $this->blocks[]  = $block;
+                }
+            }
+            else if ($name == 'snippet') {
+                foreach ($this->suite->getSnippetsBlocks("{$element['path']}") as $block) {
+                    $this->blocks[] = $block;
                 }
             }
             else {
@@ -824,10 +838,19 @@ class Test {
                 $this->blocks[] = parse_code_element($element);
             }
         }
+        $this->setContext(new Context());
+    }
+
+    public function setContext($context) {
+        $this->context = $context;
+    }
+
+    public function shouldReuseContext() {
+        return $this->reuseContext;
     }
 
     public function execute() {
-        $this->configuration->prepare($this->context);
+        $this->configuration->prepare($this->context, $this->shouldReuseContext());
         foreach ($this->blocks as $block) {
             $block->execute($this->context, $this->configuration);
             if ($this->context->isFailed()) {
@@ -837,6 +860,10 @@ class Test {
         $report = $this->configuration->getReport();
         $report->test($this->name, $this->context);
     }
+
+    public function getContext() {
+        return $this->context;
+    }
 }
 
 class Suite {
@@ -845,12 +872,14 @@ class Suite {
     private $configuration;
     private $macros;
     private $tests;
+    private $snippets;
 
-    public function __construct($configuration, $suite) {
+    public function __construct($configuration, $suite, $snippets) {
         $this->continueOnFail   = false;
         $this->configuration    = $configuration;
         $this->macros           = [];
         $this->tests            = [];
+        $this->snippets         = $snippets;
         foreach ($suite->macros as $macros) {
             foreach ($macros->macro as $macro) {
                 $macro =  new Macro($this, $macro);
@@ -885,10 +914,19 @@ class Suite {
     public function getMacroBlocks($name) {
         return isset($this->macros[$name]) ? $this->macros[$name]->getBlocks() : [];
     }
+
+    public function getSnippetsBlocks($path) {
+        return isset($this->snippets[$path]) ? $this->snippets[$path]->getBlocks() : [];
+    }
  
     public function execute() {
+        $context = new Context();
         foreach ($this->tests as $test) {
+            if ($test->shouldReuseContext()) {
+                $test->setContext($context);
+            }
             $test->execute();
+            $context = $test->getContext();
         }
     }
 }
@@ -1042,7 +1080,8 @@ class Itom {
         $this->parseVariables();
         $this->parseServices();
         $this->env->pwd = $pwd;
-        $this->env->testFolder  = sprintf("%s%sintegration-test", $pwd, DIRECTORY_SEPARATOR);
+        $this->env->testFolder  = sprintf("%s%stest", $pwd, DIRECTORY_SEPARATOR);
+        $this->env->snippetsFolder = sprintf("%s%ssnippets", $pwd, DIRECTORY_SEPARATOR);
         $this->env->description = "Intgration Tests: " . $this->env->testFolder;
         if (isset($this->model->description)) {
             $this->env->description = $this->interpolate("{$this->model->description}");
@@ -1061,14 +1100,45 @@ class Itom {
     }
 }
 
+class Snippet {
+    private $path;
+    private $blocks;
+
+    public function __construct($snippetsFolder, $category, $file) {
+        $this->path = "$category/$file";
+        $content = file_get_contents(join_path([$snippetsFolder, $category, $file]));
+        $xml = simplexml_load_string($content);
+        $this->blocks = [];
+        foreach ($xml->children() as $element) {
+            $this->blocks[] = parse_code_element($element);
+        }
+    }
+
+    public function getPath() {
+        return $this->path;
+    }
+
+    public function getBlocks() {
+        return $this->blocks;
+    }
+}
+
 $itom = new Itom($argv);
 $itom->load();
 if ( ! $itom->isValid()) {
     echo $itom->getError() . PHP_EOL;
     exit(1);
 }
-
 $env = $itom->getEnv();
+
+$snippets = [];
+foreach (filter_files(join_path($env->testFolder)) as $category) {
+    foreach (filter_files(join_path([$env->snippetsFolder, $category])) as $file) {
+        $snippet = new Snippet($env->snippetsFolder, $category, $file);
+        $snippets[$snippet->getPath()] = $snippet;
+    }
+}
+
 $configuration = new Configuration($env, $argv);
 $report = $configuration->getReport();
 
@@ -1093,7 +1163,7 @@ foreach ($cateogories as $category) {
         if ( ! $configuration->enabledSuite($suite)) continue;
         $report->suite($suite);
         $suite = simplexml_load_string((file_get_contents(join_path([$env->testFolder, $category, $suite]))));
-        $suite = new Suite($configuration, $suite);
+        $suite = new Suite($configuration, $suite, $snippets);
         $suite->execute();
     }
 }
