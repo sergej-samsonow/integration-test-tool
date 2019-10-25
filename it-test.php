@@ -1080,7 +1080,7 @@ class Itom {
         $this->parseVariables();
         $this->parseServices();
         $this->env->pwd = $pwd;
-        $this->env->testFolder  = sprintf("%s%stest", $pwd, DIRECTORY_SEPARATOR);
+        $this->env->testFolder  = sprintf("%s%stests", $pwd, DIRECTORY_SEPARATOR);
         $this->env->snippetsFolder = sprintf("%s%ssnippets", $pwd, DIRECTORY_SEPARATOR);
         $this->env->description = "Intgration Tests: " . $this->env->testFolder;
         if (isset($this->model->description)) {
